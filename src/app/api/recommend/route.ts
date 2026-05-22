@@ -184,19 +184,96 @@ Do not include any markdown formatting or wrapper, just the raw JSON array.`;
           "Interpreter of Maladies by Jhumpa Lahiri"
         ];
       } else if (lowerQuery.includes("mystery") || lowerQuery.includes("suspense")) {
-        searchTerms = ["Agatha Christie", "Sherlock Holmes", "Gillian Flynn"];
+        searchTerms = [
+          "The Girl with the Dragon Tattoo by Stieg Larsson",
+          "Gone Girl by Gillian Flynn",
+          "The Da Vinci Code by Dan Brown",
+          "And Then There Were None by Agatha Christie",
+          "The Hound of the Baskervilles by Arthur Conan Doyle",
+          "The Silent Patient by Alex Michaelides",
+          "Big Little Lies by Liane Moriarty",
+          "Rebecca by Daphne du Maurier",
+          "The Girl on the Train by Paula Hawkins",
+          "Shutter Island by Dennis Lehane"
+        ];
       } else if (lowerQuery.includes("fantasy")) {
-        searchTerms = ["J.R.R. Tolkien", "Brandon Sanderson", "George R.R. Martin"];
+        searchTerms = [
+          "The Hobbit by J.R.R. Tolkien",
+          "The Way of Kings by Brandon Sanderson",
+          "A Game of Thrones by George R.R. Martin",
+          "The Name of the Wind by Patrick Rothfuss",
+          "Harry Potter and the Sorcerer's Stone by J.K. Rowling",
+          "Mistborn: The Final Empire by Brandon Sanderson",
+          "American Gods by Neil Gaiman",
+          "The Fellowship of the Ring by J.R.R. Tolkien",
+          "The Priory of the Orange Tree by Samantha Shannon",
+          "The Blade Itself by Joe Abercrombie"
+        ];
       } else if (lowerQuery.includes("existential") || lowerQuery.includes("philosophy") || lowerQuery.includes("literary")) {
-        searchTerms = ["Albert Camus", "Fyodor Dostoevsky", "Virginia Woolf"];
+        searchTerms = [
+          "The Stranger by Albert Camus",
+          "Crime and Punishment by Fyodor Dostoevsky",
+          "To the Lighthouse by Virginia Woolf",
+          "Thus Spoke Zarathustra by Friedrich Nietzsche",
+          "The Metamorphosis by Franz Kafka",
+          "Nausea by Jean-Paul Sartre",
+          "The Picture of Dorian Gray by Oscar Wilde",
+          "The Brothers Karamazov by Fyodor Dostoevsky",
+          "Man's Search for Meaning by Viktor Frankl",
+          "Siddhartha by Hermann Hesse"
+        ];
       } else if (lowerQuery.includes("academia") || lowerQuery.includes("thriller")) {
-        searchTerms = ["Donna Tartt", "M.L. Rio", "R.F. Kuang Babel"];
+        searchTerms = [
+          "The Secret History by Donna Tartt",
+          "If We Were Villains by M.L. Rio",
+          "Babel by R.F. Kuang",
+          "Ninth House by Leigh Bardugo",
+          "The Maidens by Alex Michaelides",
+          "Bunny by Mona Awad",
+          "The Lake of Dead Languages by Carol Goodman",
+          "A Lesson in Vengeance by Victoria Lee",
+          "Catherine House by Elisabeth Thomas",
+          "Special Topics in Calamity Physics by Marisha Pessl"
+        ];
       } else if (lowerQuery.includes("romance") || lowerQuery.includes("cozy")) {
-        searchTerms = ["Jane Austen", "Emily Henry", "Beth O'Leary"];
+        searchTerms = [
+          "Pride and Prejudice by Jane Austen",
+          "Book Lovers by Emily Henry",
+          "The Flatshare by Beth O'Leary",
+          "The Love Hypothesis by Ali Hazelwood",
+          "Normal People by Sally Rooney",
+          "Red, White & Royal Blue by Casey McQuiston",
+          "Beach Read by Emily Henry",
+          "The House in the Cerulean Sea by TJ Klune",
+          "It Ends with Us by Colleen Hoover",
+          "The Midnight Library by Matt Haig"
+        ];
       } else if (lowerQuery.includes("sci-fi") || lowerQuery.includes("space") || lowerQuery.includes("science fiction")) {
-        searchTerms = ["Frank Herbert", "Isaac Asimov", "Andy Weir"];
+        searchTerms = [
+          "Dune by Frank Herbert",
+          "Foundation by Isaac Asimov",
+          "The Martian by Andy Weir",
+          "Project Hail Mary by Andy Weir",
+          "Neuromancer by William Gibson",
+          "Ender's Game by Orson Scott Card",
+          "Snow Crash by Neal Stephenson",
+          "Hyperion by Dan Simmons",
+          "The Left Hand of Darkness by Ursula K. Le Guin",
+          "Leviathan Wakes by James S.A. Corey"
+        ];
       } else if (lowerQuery.includes("historical") || lowerQuery.includes("time")) {
-        searchTerms = ["Ken Follett", "Hilary Mantel", "Anthony Doerr"];
+        searchTerms = [
+          "The Pillars of the Earth by Ken Follett",
+          "Wolf Hall by Hilary Mantel",
+          "All the Light We Cannot See by Anthony Doerr",
+          "The Book Thief by Markus Zusak",
+          "The Seven Husbands of Evelyn Hugo by Taylor Jenkins Reid",
+          "A Gentleman in Moscow by Amor Towles",
+          "The Nightingale by Kristin Hannah",
+          "Circe by Madeline Miller",
+          "Kindred by Octavia Butler",
+          "Pachinko by Min Jin Lee"
+        ];
       }
     }
 
