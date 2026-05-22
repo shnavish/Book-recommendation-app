@@ -246,7 +246,7 @@ Do not include any markdown formatting or wrapper, just the raw JSON array.`;
         try {
           const results = await fetchBooks(searchString);
           // Strong match validation to prevent iTunes from injecting random loose keyword matches
-          const validMatch = results.find(r => {
+          const validMatch = results.find((r: any) => {
              // Remove articles and punctuation for a cleaner match
              const cleanAiTitle = title.toLowerCase().replace(/^(the|a|an)\s+/i, '').replace(/[^\w\s]/g, '').trim();
              const cleanItunesTitle = r.title.toLowerCase().replace(/^(the|a|an)\s+/i, '').replace(/[^\w\s]/g, '').trim();

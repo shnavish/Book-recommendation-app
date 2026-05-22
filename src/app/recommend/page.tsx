@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Sparkles, BookHeart } from "lucide-react";
@@ -17,12 +17,13 @@ type Recommendation = {
   matchScore: number;
   tags: string[];
   coverUrl?: string;
+  purchaseLink?: string;
   amazonLink?: string;
   flipkartLink?: string;
   padhegaLink?: string;
 };
 
-export default function RecommendPage() {
+function RecommendContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q");
 
@@ -213,5 +214,17 @@ export default function RecommendPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function RecommendPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-24 pb-20 px-6 container mx-auto text-center flex flex-col justify-center items-center">
+        <p className="text-xl text-muted-foreground animate-pulse">Loading recommendations...</p>
+      </div>
+    }>
+      <RecommendContent />
+    </Suspense>
   );
 }

@@ -17,6 +17,7 @@ type TrendingBook = {
   tags: string[];
   description?: string;
   coverUrl?: string;
+  purchaseLink?: string;
   amazonLink?: string;
   flipkartLink?: string;
   padhegaLink?: string;
