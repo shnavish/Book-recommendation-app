@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles, BookHeart } from "lucide-react";
+import { ArrowLeft, Sparkles, BookHeart, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -35,46 +35,49 @@ function RecommendContent() {
     setExpandedDesc((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  useEffect(() => {
+  const fetchRecommendations = async (bypass = false, exclude: string[] = []) => {
     if (!query) return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, bypassCache: bypass, excludeTitles: exclude }),
+      });
+      const data = await response.json();
+      const recs = data.recommendations || [];
+      setRecommendations(recs);
 
-    // Simulate API call for recommendations
-    const fetchRecommendations = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch("/api/recommend", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
-        });
-        const data = await response.json();
-        const recs = data.recommendations || [];
-        setRecommendations(recs);
-
-        // Sync with dashboard real-time data
-        if (recs.length > 0) {
-          try {
-            const storedHistory = JSON.parse(localStorage.getItem('bookflux_history') || '[]');
-            const newHistory = [
-              { id: Date.now(), title: recs[0].title, date: 'Just now', match: recs[0].matchScore },
-              ...storedHistory.filter((item: any) => item.title !== recs[0].title).slice(0, 4)
-            ];
-            localStorage.setItem('bookflux_history', JSON.stringify(newHistory));
-            
-            const stats = JSON.parse(localStorage.getItem('bookflux_stats') || '{"explored": 124, "favorites": 32}');
-            stats.explored += recs.length;
-            localStorage.setItem('bookflux_stats', JSON.stringify(stats));
-          } catch (e) {}
-        }
-      } catch (error) {
-        console.error("Failed to fetch recommendations", error);
-      } finally {
-        setLoading(false);
+      // Sync with dashboard real-time data
+      if (recs.length > 0) {
+        try {
+          const storedHistory = JSON.parse(localStorage.getItem('bookflux_history') || '[]');
+          const newHistory = [
+            { id: Date.now(), title: recs[0].title, date: 'Just now', match: recs[0].matchScore },
+            ...storedHistory.filter((item: any) => item.title !== recs[0].title).slice(0, 4)
+          ];
+          localStorage.setItem('bookflux_history', JSON.stringify(newHistory));
+          
+          const stats = JSON.parse(localStorage.getItem('bookflux_stats') || '{"explored": 124, "favorites": 32}');
+          stats.explored += recs.length;
+          localStorage.setItem('bookflux_stats', JSON.stringify(stats));
+        } catch (e) {}
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch recommendations", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchRecommendations();
+  useEffect(() => {
+    fetchRecommendations(false);
   }, [query]);
+
+  const handleRegenerate = () => {
+    const activeTitles = recommendations.map(r => r.title);
+    fetchRecommendations(true, activeTitles);
+  };
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 container mx-auto">
@@ -85,19 +88,30 @@ function RecommendContent() {
         </Button>
       </Link>
 
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 sm:mb-12"
-      >
-        <h1 className="text-2xl sm:text-3xl font-heading font-bold mb-2 sm:mb-4">
-          Curated for you
-        </h1>
-        <p className="text-sm sm:text-lg text-muted-foreground flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <Sparkles className="w-4 h-4 sm:w-5 h-5 text-primary shrink-0" />
-          Based on: <span className="text-foreground italic break-all">&quot;{query}&quot;</span>
-        </p>
-      </motion.div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 sm:mb-12 border-b border-white/5 pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-1 sm:space-y-2"
+        >
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold">
+            Curated for you
+          </h1>
+          <p className="text-sm sm:text-lg text-muted-foreground flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <Sparkles className="w-4 h-4 sm:w-5 h-5 text-primary shrink-0" />
+            Based on: <span className="text-foreground italic break-all">&quot;{query}&quot;</span>
+          </p>
+        </motion.div>
+        
+        <Button 
+          onClick={handleRegenerate}
+          disabled={loading}
+          className="bg-primary/20 hover:bg-primary/45 text-primary hover:text-white border border-primary/30 rounded-full px-6 flex items-center gap-2 self-start md:self-center transition-all hover:scale-105 active:scale-95 shadow-md shadow-black/40 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 text-primary ${loading ? 'animate-spin' : ''}`} />
+          Regenerate List
+        </Button>
+      </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">

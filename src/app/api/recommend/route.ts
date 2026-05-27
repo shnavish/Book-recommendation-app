@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json();
+    const { query, bypassCache, excludeTitles } = await req.json();
     
     // 1. Check Cache Layer (Phase 5: Reduce AI token cost and latency)
     const lowerQuery = query.toLowerCase().trim();
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const cacheKey = `rec_v27_${lowerQuery}`;
     const cachedResponse = !isSurpriseQuery ? recommendationCache.get(cacheKey) : null;
     
-    if (cachedResponse) {
+    if (cachedResponse && !bypassCache) {
       console.log("[Cache Hit] Returning cached recommendations for:", query);
       return NextResponse.json(
         { recommendations: cachedResponse, source: "cache" },
@@ -28,6 +28,18 @@ export async function POST(req: Request) {
     }
     
     let isAi = false;
+    let fallbackToCache = false;
+
+    const filterExcluded = (pool: any[]) => {
+      if (!Array.isArray(excludeTitles) || excludeTitles.length === 0) return pool;
+      const excludeSet = new Set(excludeTitles.map((t: string) => t.toLowerCase().trim()));
+      return pool.filter(item => {
+        const titleText = typeof item === 'string' ? item : (item.title || "");
+        if (!titleText) return true;
+        const cleanTitle = titleText.split(/ by /i)[0].toLowerCase().trim();
+        return !excludeSet.has(cleanTitle);
+      });
+    };
     
     // Function to fetch and map books using iTunes API to get accurate publisher descriptions
     const fetchBooks = async (searchQuery: string) => {
@@ -65,7 +77,7 @@ export async function POST(req: Request) {
           ) {
             return false;
           }
-
+ 
           // Aggressively normalize title to catch duplicates like "(Unabridged)", ": A Novel"
           let normalizedTitle = lowercaseTitle.trim();
           normalizedTitle = normalizedTitle.replace(/\(.*?\)/g, ''); // Remove text in parentheses
@@ -82,7 +94,7 @@ export async function POST(req: Request) {
         });
         
         if (validBooks.length === 0) return [];
-
+ 
         return validBooks.slice(0, 10).map((item: any, index: number) => {
           // Strip HTML tags and decode HTML entities from publisher descriptions
           const cleanDescription = item.description
@@ -120,7 +132,7 @@ export async function POST(req: Request) {
         return [];
       }
     };
-
+ 
     // Map generic genres to specific iconic authors/titles because iTunes is a keyword search API
     let searchTerms = [query];
     
@@ -128,13 +140,26 @@ export async function POST(req: Request) {
     try {
       if (process.env.GEMINI_API_KEY) {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const prompt = `You are an expert book recommender. The user is looking for books based on this specific query: "${query}". Return a JSON array of exactly 10 of the MOST POPULAR, iconic, and culturally significant books.
+        
+        const excludeConstraint = Array.isArray(excludeTitles) && excludeTitles.length > 0
+          ? `\nCRITICAL FRESHNESS RULE: You MUST strictly avoid recommending any of the following books, as the user has already seen them. Generate entirely different suggestions:
+${excludeTitles.map((t: any) => `- "${t}"`).join("\n")}\n`
+          : "";
+
+        const prompt = `You are a sophisticated, diverse book recommendation engine. The user is looking for books based on this specific query or mood: "${query}". 
+To provide a fresh, surprising, and dynamic experience, generate a highly diverse selection of exactly 10 books. This list must include a mix of:
+- 3-4 highly acclaimed popular/iconic books,
+- 3-4 lesser-known hidden gems, indie favorites, or under-the-radar masterpieces,
+- 2-3 modern, contemporary publications from recent years.
+
+Ensure these books fit the themes, pacing, and emotional tone of the query perfectly. Introduce a healthy degree of diversity and surprise in the selection, avoiding repeating only the most famous household classics.
+${excludeConstraint}
 For each book, return an object with the following fields:
 - "title": The title of the book.
 - "author": The author's name.
 - "summary": A compelling 2-3 sentence summary of the book detailing its plot, central themes, and relevance to the user's request. Do not include spoilers.
 - "tags": An array of 2-3 relevant genre or thematic tags.
-
+ 
 CRITICAL RULE for genre: You MUST strictly adhere to the exact genre or format requested by the user. If the user asks for autobiographies, ALL 10 books MUST be autobiographies. If the user asks for non-fiction, do NOT include fiction.
 CRITICAL RULE for "similar to" queries: If the user asks for books similar to a specific series (including common acronyms like LOTR, ASOIAF, HP), you MUST strictly follow this distribution:
 1) First, identify the full name of the series from any acronyms.
@@ -142,7 +167,7 @@ CRITICAL RULE for "similar to" queries: If the user asks for books similar to a 
 3) You may include UP TO 5 spin-offs or prequels from the same universe ONLY if they fit the new constraint (e.g. The Hobbit).
 4) The remaining books MUST be from COMPLETELY DIFFERENT authors and universes.
 CRITICAL RULE for geography: Always interpret the term "Indian" as referring to the country of India (South Asia), not Native American.
-
+ 
 Example JSON response:
 [
   {
@@ -152,12 +177,15 @@ Example JSON response:
     "tags": ["Dystopian", "Classics", "Political Fiction"]
   }
 ]
-
+ 
 Do not include any markdown formatting or wrapper, just the raw JSON array.`;
         
         const response = await ai.models.generateContent({
            model: 'gemini-2.5-flash',
            contents: prompt,
+           config: {
+             temperature: 0.95,
+           }
         });
         
         if (response.text) {
@@ -173,7 +201,19 @@ Do not include any markdown formatting or wrapper, just the raw JSON array.`;
         console.warn("[AI Mapping] GEMINI_API_KEY is missing. Falling back to manual mapper.");
       }
     } catch (error) {
-      console.error("[AI Mapping Error] Falling back to manual map:", error);
+      console.error("[AI Mapping Error] Gemini call failed:", error);
+      if (cachedResponse) {
+        fallbackToCache = true;
+        console.log("[AI Limit Graceful Fallback] Gemini failed, utilizing cache as safety layer.");
+      }
+    }
+
+    // Graceful cache fallback handler if live API call failed
+    if (fallbackToCache && cachedResponse) {
+      return NextResponse.json(
+        { recommendations: cachedResponse, source: "cache_fallback" },
+        { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
+      );
     }
     
     // Fallback manual mapping if AI is not configured or fails
@@ -209,7 +249,12 @@ Do not include any markdown formatting or wrapper, just the raw JSON array.`;
            { title: "Normal People", author: "Sally Rooney", tags: ["Contemporary", "Romance"] },
            { title: "The Stranger", author: "Albert Camus", tags: ["Existentialism", "Philosophy"] },
            { title: "The Metamorphosis", author: "Franz Kafka", tags: ["Surreal", "Absurdist"] },
-           { title: "Man's Search for Meaning", author: "Viktor Frankl", tags: ["Psychology", "Philosophy"] }
+           { title: "Man's Search for Meaning", author: "Viktor Frankl", tags: ["Psychology", "Philosophy"] },
+           { title: "Piranesi", author: "Susanna Clarke", tags: ["Fantasy", "Surreal"] },
+           { title: "Klara and the Sun", author: "Kazuo Ishiguro", tags: ["Sci-Fi", "Literary Fiction"] },
+           { title: "The Night Circus", author: "Erin Morgenstern", tags: ["Fantasy", "Romance"] },
+           { title: "The Maid", author: "Nita Prose", tags: ["Mystery", "Cozy Mystery"] },
+           { title: "Educated", author: "Tara Westover", tags: ["Memoir", "Biography"] }
          ];
          const shuffled = [...categoryPools].sort(() => 0.5 - Math.random());
          searchTerms = shuffled.slice(0, 10).map(b => ({
@@ -718,6 +763,65 @@ Do not include any markdown formatting or wrapper, just the raw JSON array.`;
         }
       ];
     }
+
+    // 1.5 Ensure freshness guarantee: remove any excluded titles from the final set
+    const generalPool = [
+      { title: "The Secret History", author: "Donna Tartt", tags: ["Dark Academia", "Mystery"], coverUrl: "https://covers.openlibrary.org/b/isbn/9781400031702-L.jpg" },
+      { title: "Piranesi", author: "Susanna Clarke", tags: ["Fantasy", "Surreal"], coverUrl: "https://covers.openlibrary.org/b/isbn/9781635575637-L.jpg" },
+      { title: "The Hobbit", author: "J.R.R. Tolkien", tags: ["High Fantasy", "Classics"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780261103344-L.jpg" },
+      { title: "The Way of Kings", author: "Brandon Sanderson", tags: ["Epic Fantasy", "High Fantasy"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780765326355-L.jpg" },
+      { title: "Babel", author: "R.F. Kuang", tags: ["Dark Academia", "Historical Fantasy"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780063021426-L.jpg" },
+      { title: "And Then There Were None", author: "Agatha Christie", tags: ["Classic Mystery", "Whodunit"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780062073488-L.jpg" },
+      { title: "Gone Girl", author: "Gillian Flynn", tags: ["Psychological Thriller", "Suspense"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780307588371-L.jpg" },
+      { title: "The Silent Patient", author: "Alex Michaelides", tags: ["Psychological Thriller", "Mystery"], coverUrl: "https://covers.openlibrary.org/b/isbn/9781250301697-L.jpg" },
+      { title: "Dune", author: "Frank Herbert", tags: ["Science Fiction", "Space Epic"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780441172719-L.jpg" },
+      { title: "Project Hail Mary", author: "Andy Weir", tags: ["Sci-Fi", "Space Adventure"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780593135204-L.jpg" },
+      { title: "Neuromancer", author: "William Gibson", tags: ["Cyberpunk", "Sci-Fi"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780441569595-L.jpg" },
+      { title: "Pride and Prejudice", author: "Jane Austen", tags: ["Classic Romance", "Literature"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780141439517-L.jpg" },
+      { title: "The House in the Cerulean Sea", author: "TJ Klune", tags: ["Cozy Fantasy", "Romance"], coverUrl: "https://covers.openlibrary.org/b/isbn/9781250252173-L.jpg" },
+      { title: "Normal People", author: "Sally Rooney", tags: ["Contemporary", "Romance"], coverUrl: "https://covers.openlibrary.org/b/isbn/9781984822178-L.jpg" },
+      { title: "The Stranger", author: "Albert Camus", tags: ["Existentialism", "Philosophy"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780679720201-L.jpg" },
+      { title: "The Metamorphosis", author: "Franz Kafka", tags: ["Surreal", "Absurdist"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780553213690-L.jpg" },
+      { title: "Man's Search for Meaning", author: "Viktor Frankl", tags: ["Psychology", "Philosophy"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780807014295-L.jpg" },
+      { title: "Klara and the Sun", author: "Kazuo Ishiguro", tags: ["Sci-Fi", "Literary Fiction"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780593318171-L.jpg" },
+      { title: "The Night Circus", author: "Erin Morgenstern", tags: ["Fantasy", "Romance"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780307744432-L.jpg" },
+      { title: "The Maid", author: "Nita Prose", tags: ["Mystery", "Cozy Mystery"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780593356159-L.jpg" },
+      { title: "Educated", author: "Tara Westover", tags: ["Memoir", "Biography"], coverUrl: "https://covers.openlibrary.org/b/isbn/9780393088663-L.jpg" }
+    ];
+
+    let finalRecs = filterExcluded(mockRecommendations);
+    
+    if (finalRecs.length < 10) {
+      const existingTitles = new Set(finalRecs.map(r => r.title.toLowerCase().trim()));
+      const excludeSet = new Set((excludeTitles || []).map((t: string) => t.toLowerCase().trim()));
+      
+      const eligibleFiller = generalPool.filter(book => {
+        const titleNorm = book.title.toLowerCase().trim();
+        return !existingTitles.has(titleNorm) && !excludeSet.has(titleNorm);
+      });
+      
+      const shuffledFiller = [...eligibleFiller].sort(() => 0.5 - Math.random());
+      const needed = 10 - finalRecs.length;
+      
+      const fillerSlice = shuffledFiller.slice(0, needed).map((book, idx) => ({
+        id: `filler-${idx}-${Date.now()}`,
+        title: book.title,
+        author: book.author,
+        description: `An exceptional, highly recommended companion choice selected to complement your thematic preference.`,
+        reason: `A universally acclaimed classic that perfectly matches the emotional profile of your curation.`,
+        matchScore: 85 - idx * 2,
+        tags: [...book.tags, "Surprise Find"],
+        coverUrl: book.coverUrl,
+        purchaseLink: "#",
+        amazonLink: `https://www.amazon.com/s?k=${encodeURIComponent(book.title + ' ' + book.author)}`,
+        flipkartLink: `https://www.flipkart.com/search?q=${encodeURIComponent(book.title + ' ' + book.author)}`,
+        padhegaLink: `https://padhegaindia.in/?post_type=product&s=${encodeURIComponent(book.title + ' ' + book.author)}`,
+      }));
+      
+      finalRecs = [...finalRecs, ...fillerSlice];
+    }
+    
+    mockRecommendations = finalRecs.slice(0, 10);
 
     // 2. Store in Cache Layer (Only for AI-generated results to save quota, never cache manual shuffled sets or randoms)
     if (isAi && !isSurpriseQuery) {
