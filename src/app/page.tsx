@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Sparkles, TrendingUp, BookOpen, Network, Menu, X } from "lucide-react";
+import { Search, Sparkles, TrendingUp, BookOpen, Network, Menu, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [centerIndex, setCenterIndex] = useState(3);
 
   useEffect(() => {
     const handleResize = () => {
@@ -221,13 +222,13 @@ export default function Home() {
               { name: 'Space', desc: 'Sci-Fi Adventures', img: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=400' },
             ].map((tome, index) => {
               const i = index + 1;
-              const isCenter = i === 4;
-              const offset = Math.abs(i - 4);
+              const isCenter = index === centerIndex;
+              const offset = Math.abs(index - centerIndex);
               const zIndex = 10 - offset;
               const scale = isCenter ? 1.1 : 1 - offset * 0.1;
               const yPos = offset * (isMobile ? 8 : 20);
-              const rotateY = (i - 4) * (isMobile ? 8 : 15);
-              const isMiddleThree = i >= 3 && i <= 5;
+              const rotateY = (index - centerIndex) * (isMobile ? 8 : 15);
+              const isVisibleMobile = offset <= 1;
               
               return (
                 <motion.div
@@ -255,7 +256,7 @@ export default function Home() {
                     zIndex: 20,
                     boxShadow: "0 30px 60px -12px rgba(200, 169, 107, 0.4)"
                   }}
-                  className={`relative w-20 sm:w-28 md:w-48 aspect-[2/3] rounded-md overflow-hidden shadow-2xl transition-all duration-300 cursor-pointer group ${!isMiddleThree ? 'hidden md:block' : ''}`}
+                  className={`relative w-20 sm:w-28 md:w-48 aspect-[2/3] rounded-md overflow-hidden shadow-2xl transition-all duration-300 cursor-pointer group ${!isVisibleMobile ? 'hidden md:block' : ''}`}
                   style={{
                     transformStyle: "preserve-3d",
                     zIndex,
@@ -277,6 +278,27 @@ export default function Home() {
               );
             })}
           </motion.div>
+
+          {/* Mobile Navigation Arrows */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setCenterIndex(prev => Math.max(1, prev - 1))}
+              disabled={centerIndex === 1}
+              className="absolute left-2 sm:left-4 top-[60px] sm:top-[84px] -translate-y-1/2 z-30 w-10 h-10 rounded-full flex items-center justify-center glass border border-white/10 text-white transition-all duration-300 hover:bg-primary/20 hover:border-primary/50 disabled:opacity-20 disabled:pointer-events-none active:scale-90 shadow-lg shadow-black/40"
+              aria-label="Previous tomes"
+            >
+              <ChevronLeft className="w-5 h-5 text-primary" />
+            </button>
+            <button
+              onClick={() => setCenterIndex(prev => Math.min(5, prev + 1))}
+              disabled={centerIndex === 5}
+              className="absolute right-2 sm:right-4 top-[60px] sm:top-[84px] -translate-y-1/2 z-30 w-10 h-10 rounded-full flex items-center justify-center glass border border-white/10 text-white transition-all duration-300 hover:bg-primary/20 hover:border-primary/50 disabled:opacity-20 disabled:pointer-events-none active:scale-90 shadow-lg shadow-black/40"
+              aria-label="Next tomes"
+            >
+              <ChevronRight className="w-5 h-5 text-primary" />
+            </button>
+          </div>
+
           {/* Glowing Ambient Base */}
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent blur-sm" />
         </div>
